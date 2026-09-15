@@ -32,6 +32,7 @@ local Config = {
     VisibilityCheck = true,
     DistanceCheck = true,
     Distance = 500,
+    Bhop = false,
     FOV = 120,
     HitChance = 100,
     Bhop = false,
@@ -63,6 +64,10 @@ end
 local CONFIG_FOLDER = "DevAimConfigs"
 local LAST_CONFIG_FILE = CONFIG_FOLDER .. "/last.txt"
 local BUTTON_POSITION_FILE = CONFIG_FOLDER .. "/button_position.json"
+local BUTTON_LOCK_FILE = CONFIG_FOLDER .. "/button_lock.txt"
+
+local DEFAULT_BUTTON_X = 14
+local DEFAULT_BUTTON_Y_FROM_BOTTOM = 58
 
 local function canUseFiles()
     return typeof(writefile) == "function"
@@ -772,7 +777,7 @@ end
 
 updateContent()
 
---// OPEN BUTTON
+--// OPEN BUTTON + LOCK/RESPAWN CONTROLS
 local function loadOpenButtonPosition()
     if not canUseFiles() then
         return nil
@@ -807,6 +812,18 @@ local function saveOpenButtonPosition(x, y)
     end)
 end
 
+local function clearOpenButtonPosition()
+    if not canUseFiles() then
+        return
+    end
+
+    pcall(function()
+        if isfile(BUTTON_POSITION_FILE) then
+            delfile(BUTTON_POSITION_FILE)
+        end
+    end)
+end
+
 local OpenButton = Instance.new("TextButton")
 OpenButton.Name = "OpenButton"
 OpenButton.Size = UDim2.fromOffset(44, 44)
@@ -814,7 +831,7 @@ local savedX, savedY = loadOpenButtonPosition()
 if savedX and savedY then
     OpenButton.Position = UDim2.fromOffset(savedX, savedY)
 else
-    OpenButton.Position = UDim2.new(0, 14, 1, -58)
+    OpenButton.Position = UDim2.new(0, DEFAULT_BUTTON_X, 1, -DEFAULT_BUTTON_Y_FROM_BOTTOM)
 end
 OpenButton.BackgroundColor3 = Color3.fromRGB(18, 23, 28)
 OpenButton.Text = "≡"
@@ -833,13 +850,95 @@ OpenStroke.Color = Color3.fromRGB(0, 150, 210)
 OpenStroke.Thickness = 1.3
 OpenStroke.Parent = OpenButton
 
--- Drag the open button on touch/mouse and remember its position between activations.
+-- Small control bar above the default opening-button position.
+local ButtonControl = Instance.new("Frame")
+ButtonControl.Name = "ButtonControl"
+ButtonControl.Size = UDim2.fromOffset(178, 38)
+ButtonControl.Position = UDim2.new(0, DEFAULT_BUTTON_X, 1, -(DEFAULT_BUTTON_Y_FROM_BOTTOM + 48))
+ButtonControl.BackgroundColor3 = Color3.fromRGB(15, 20, 25)
+ButtonControl.BackgroundTransparency = 0.04
+ButtonControl.BorderSizePixel = 0
+ButtonControl.Parent = ScreenGui
+
+local ControlCorner = Instance.new("UICorner")
+ControlCorner.CornerRadius = UDim.new(0, 9)
+ControlCorner.Parent = ButtonControl
+
+local ControlStroke = Instance.new("UIStroke")
+ControlStroke.Color = Color3.fromRGB(45, 65, 75)
+ControlStroke.Thickness = 1
+ControlStroke.Parent = ButtonControl
+
+local LockButton = Instance.new("TextButton")
+LockButton.Name = "LockButton"
+LockButton.Size = UDim2.fromOffset(84, 30)
+LockButton.Position = UDim2.fromOffset(4, 4)
+LockButton.BackgroundColor3 = Color3.fromRGB(25, 50, 63)
+LockButton.Text = "UnLock"
+LockButton.TextColor3 = Color3.fromRGB(230, 240, 245)
+LockButton.Font = Enum.Font.GothamBold
+LockButton.TextSize = 11
+LockButton.AutoButtonColor = false
+LockButton.Parent = ButtonControl
+
+local LockCorner = Instance.new("UICorner")
+LockCorner.CornerRadius = UDim.new(0, 7)
+LockCorner.Parent = LockButton
+
+local RespawnButton = Instance.new("TextButton")
+RespawnButton.Name = "RespawnButton"
+RespawnButton.Size = UDim2.fromOffset(84, 30)
+RespawnButton.Position = UDim2.fromOffset(90, 4)
+RespawnButton.BackgroundColor3 = Color3.fromRGB(25, 50, 63)
+RespawnButton.Text = "Respawn"
+RespawnButton.TextColor3 = Color3.fromRGB(230, 240, 245)
+RespawnButton.Font = Enum.Font.GothamBold
+RespawnButton.TextSize = 11
+RespawnButton.AutoButtonColor = false
+RespawnButton.Parent = ButtonControl
+
+local RespawnCorner = Instance.new("UICorner")
+RespawnCorner.CornerRadius = UDim.new(0, 7)
+RespawnCorner.Parent = RespawnButton
+
+-- Locked by default on every script activation.
+local OpenButtonLocked = true
 local buttonDragging = false
 local buttonMoved = false
 local buttonDragStart
 local buttonStartPosition
 
+local function updateLockText()
+    LockButton.Text = OpenButtonLocked and "UnLock" or "Lock"
+end
+
+local function resetOpenButtonPosition()
+    local viewport = Camera.ViewportSize
+    local x = math.clamp(DEFAULT_BUTTON_X, 0, math.max(viewport.X - OpenButton.AbsoluteSize.X, 0))
+    local y = math.clamp(
+        viewport.Y - DEFAULT_BUTTON_Y_FROM_BOTTOM - OpenButton.AbsoluteSize.Y,
+        0,
+        math.max(viewport.Y - OpenButton.AbsoluteSize.Y, 0)
+    )
+
+    OpenButton.Position = UDim2.fromOffset(x, y)
+    saveOpenButtonPosition(x, y)
+end
+
+LockButton.MouseButton1Click:Connect(function()
+    OpenButtonLocked = not OpenButtonLocked
+    updateLockText()
+end)
+
+RespawnButton.MouseButton1Click:Connect(function()
+    resetOpenButtonPosition()
+end)
+
 OpenButton.InputBegan:Connect(function(input)
+    if OpenButtonLocked then
+        return
+    end
+
     if input.UserInputType == Enum.UserInputType.MouseButton1
         or input.UserInputType == Enum.UserInputType.Touch then
         buttonDragging = true
@@ -850,7 +949,7 @@ OpenButton.InputBegan:Connect(function(input)
 end)
 
 UserInputService.InputChanged:Connect(function(input)
-    if not buttonDragging then
+    if OpenButtonLocked or not buttonDragging then
         return
     end
 
@@ -890,6 +989,8 @@ OpenButton.MouseButton1Click:Connect(function()
     end
     buttonMoved = false
 end)
+
+updateLockText()
 
 --// FOV CIRCLE
 local FOVGui = Instance.new("Frame")
