@@ -33,7 +33,7 @@ local Config = {
     DistanceCheck = true,
     Distance = 500,
     Bhop = false,
-    BhopSpeed = 65,
+    BhopSpeed = 25,
     FOV = 120,
     HitChance = 100,
 
@@ -1447,6 +1447,7 @@ local ESPTimer = 0
 local AimTimer = 0
 local BhopHumanoid = nil
 local BhopOriginalSpeed = nil
+local BhopRoot = nil
 
 RunService.RenderStepped:Connect(function(deltaTime)
     Camera = workspace.CurrentCamera or Camera
@@ -1495,34 +1496,43 @@ RunService.RenderStepped:Connect(function(deltaTime)
         cleanupNPCESP()
     end
 
-    -- BHOP: ускорение через Humanoid.WalkSpeed + обычный Jump.
-    -- Никаких CFrame/телепортаций: позиция персонажа не меняется скриптом.
+    -- BHOP: движение через маленькие CFrame-шаги.
+    -- Максимальная скорость ограничена 25 studs/s.
     if Config.Bhop then
         local character = LocalPlayer.Character
         local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+        local root = character and character:FindFirstChild("HumanoidRootPart")
 
-        if humanoid and humanoid.Health > 0 then
-            -- Сохраняем исходную скорость только для текущего Humanoid.
+        if humanoid and root and humanoid.Health > 0 then
             if BhopHumanoid ~= humanoid then
                 BhopHumanoid = humanoid
                 BhopOriginalSpeed = humanoid.WalkSpeed
+                BhopRoot = root
             end
 
-            -- Максимум 65: во время Bhop скорость не превышает 65.
-            humanoid.WalkSpeed = math.min(65, math.max(0, Config.BhopSpeed or 65))
+            -- Не меняем WalkSpeed: движение выполняется только небольшими CFrame-шагами.
+            humanoid.WalkSpeed = BhopOriginalSpeed or humanoid.WalkSpeed
 
-            -- Автопрыжок только когда игрок действительно движется и стоит на земле.
-            if humanoid.MoveDirection.Magnitude > 0 and humanoid.FloorMaterial ~= Enum.Material.Air then
+            local moveDirection = humanoid.MoveDirection
+            if moveDirection.Magnitude > 0.01 then
+                local speed = math.clamp(tonumber(Config.BhopSpeed) or 25, 0, 25)
+                local step = moveDirection.Unit * speed * math.min(deltaTime, 1 / 30)
+
+                -- Маленькое смещение за кадр вместо мгновенного переноса на большое расстояние.
+                root.CFrame = root.CFrame + step
+            end
+
+            if humanoid.MoveDirection.Magnitude > 0.01 and humanoid.FloorMaterial ~= Enum.Material.Air then
                 humanoid.Jump = true
             end
         end
     elseif BhopHumanoid then
-        -- После выключения возвращаем скорость, которая была до Bhop.
         if BhopHumanoid.Parent and BhopHumanoid.Health > 0 and BhopOriginalSpeed then
             BhopHumanoid.WalkSpeed = BhopOriginalSpeed
         end
         BhopHumanoid = nil
         BhopOriginalSpeed = nil
+        BhopRoot = nil
     end
 
     -- LIGHTING
