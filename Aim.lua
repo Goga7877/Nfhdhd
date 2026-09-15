@@ -778,6 +778,10 @@ end
 updateContent()
 
 --// OPEN BUTTON + LOCK/RESPAWN CONTROLS
+-- Forward declarations: the open button is created before the menu-control section.
+local MenuOpen = false
+local openMenu, closeMenu, toggleMenu
+
 local function loadOpenButtonPosition()
     if not canUseFiles() then
         return nil
@@ -983,10 +987,9 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
-local originalToggle = toggleMenu
 OpenButton.MouseButton1Click:Connect(function()
     if not buttonMoved then
-        originalToggle()
+        toggleMenu()
     end
     buttonMoved = false
 end)
@@ -1396,9 +1399,7 @@ local function updateLighting()
 end
 
 --// MENU CONTROLS
-local MenuOpen = false
-
-local function openMenu()
+openMenu = function()
     if MenuOpen then
         return
     end
@@ -1408,7 +1409,7 @@ local function openMenu()
     Main.Visible = true
 end
 
-local function closeMenu()
+closeMenu = function()
     if not MenuOpen then
         return
     end
@@ -1417,7 +1418,7 @@ local function closeMenu()
     Main.Visible = false
 end
 
-local function toggleMenu()
+toggleMenu = function()
     if MenuOpen then
         closeMenu()
     else
