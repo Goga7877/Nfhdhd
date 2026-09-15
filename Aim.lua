@@ -851,10 +851,11 @@ OpenStroke.Thickness = 1.3
 OpenStroke.Parent = OpenButton
 
 -- Small control bar above the default opening-button position.
+-- It is placed with a clear gap so it never covers the opening button.
 local ButtonControl = Instance.new("Frame")
 ButtonControl.Name = "ButtonControl"
 ButtonControl.Size = UDim2.fromOffset(178, 38)
-ButtonControl.Position = UDim2.new(0, DEFAULT_BUTTON_X, 1, -(DEFAULT_BUTTON_Y_FROM_BOTTOM + 48))
+ButtonControl.Position = UDim2.new(0, DEFAULT_BUTTON_X, 1, -(DEFAULT_BUTTON_Y_FROM_BOTTOM + OpenButton.Size.Y.Offset + 14 + 38))
 ButtonControl.BackgroundColor3 = Color3.fromRGB(15, 20, 25)
 ButtonControl.BackgroundTransparency = 0.04
 ButtonControl.BorderSizePixel = 0
