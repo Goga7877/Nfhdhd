@@ -33,9 +33,9 @@ local Config = {
     DistanceCheck = true,
     Distance = 500,
     Bhop = false,
+    BhopSpeed = 65,
     FOV = 120,
     HitChance = 100,
-    Bhop = false,
 
     FOVCircle = true,
     FOVNumSides = 64,
@@ -1445,6 +1445,8 @@ end)
 local LightingTimer = 0
 local ESPTimer = 0
 local AimTimer = 0
+local BhopHumanoid = nil
+local BhopOriginalSpeed = nil
 
 RunService.RenderStepped:Connect(function(deltaTime)
     Camera = workspace.CurrentCamera or Camera
@@ -1493,15 +1495,34 @@ RunService.RenderStepped:Connect(function(deltaTime)
         cleanupNPCESP()
     end
 
-    -- BHOP: auto-jump while moving/grounded. This is a normal client-side movement helper.
+    -- BHOP: ускорение через Humanoid.WalkSpeed + обычный Jump.
+    -- Никаких CFrame/телепортаций: позиция персонажа не меняется скриптом.
     if Config.Bhop then
         local character = LocalPlayer.Character
         local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-        if humanoid and humanoid.Health > 0 and humanoid.MoveDirection.Magnitude > 0 then
-            if humanoid.FloorMaterial ~= Enum.Material.Air then
+
+        if humanoid and humanoid.Health > 0 then
+            -- Сохраняем исходную скорость только для текущего Humanoid.
+            if BhopHumanoid ~= humanoid then
+                BhopHumanoid = humanoid
+                BhopOriginalSpeed = humanoid.WalkSpeed
+            end
+
+            -- Максимум 65: во время Bhop скорость не превышает 65.
+            humanoid.WalkSpeed = math.min(65, math.max(0, Config.BhopSpeed or 65))
+
+            -- Автопрыжок только когда игрок действительно движется и стоит на земле.
+            if humanoid.MoveDirection.Magnitude > 0 and humanoid.FloorMaterial ~= Enum.Material.Air then
                 humanoid.Jump = true
             end
         end
+    elseif BhopHumanoid then
+        -- После выключения возвращаем скорость, которая была до Bhop.
+        if BhopHumanoid.Parent and BhopHumanoid.Health > 0 and BhopOriginalSpeed then
+            BhopHumanoid.WalkSpeed = BhopOriginalSpeed
+        end
+        BhopHumanoid = nil
+        BhopOriginalSpeed = nil
     end
 
     -- LIGHTING
